@@ -2,11 +2,19 @@ import os
 import random
 
 GRID_SIZE = 5
-PLAYER = "@"
-COLLECTIBLE = "★"
-HAZARD = "X"
-EMPTY = "·"
+PLAYER = "\U0001f409"
+COLLECTIBLE = "\U0001f356"
+HAZARD = "\U0001f93a"
+EMPTY = "\u00b7"
 WIN_SCORE = 10
+WIN_MESSAGE = "Congrats! Your belly is full and your slumber may continue."
+LOSE_MESSAGE = "Oh No!!! You have been captured by the knight!"
+GAME_NAME = "Hungry Dragon"
+STORY_INTRO = (
+    "You are a dragon (\U0001f409) who has awakened from it's 1000 year slumber "
+    "and is craving  his favourite food (\U0001f356). Find enough food to continue "
+    "your slumber but be careful of the knights looking for you!"
+)
 
 def clear_screen():
     os.system("cls" if os.name == "nt" else "clear")
@@ -78,7 +86,7 @@ def play_round() -> bool:
             clear_screen()
             print(f"Score: {score}/{WIN_SCORE}")
             draw_grid(tuple(player_pos), collectible_pos, hazard_pos)
-            print("Game Over!")
+            print(LOSE_MESSAGE)
             break
 
         # Check collectible
@@ -88,7 +96,7 @@ def play_round() -> bool:
                 clear_screen()
                 print(f"Score: {score}/{WIN_SCORE}")
                 draw_grid(tuple(player_pos), collectible_pos, hazard_pos)
-                print("You win! Well played!")
+                print(WIN_MESSAGE)
                 break
             collectible_pos = spawn_collectible(tuple(player_pos))
 
@@ -101,8 +109,10 @@ def play_round() -> bool:
             return False
 
 def main():
-    print("Welcome! You are the '@' symbol on a 5x5 grid.")
-    print("Collect the '★' to score points. Avoid the 'X'!")
+    clear_screen()
+    print(f"=== {GAME_NAME} ===\n")
+    print(STORY_INTRO)
+    print(f"\nCollect the {COLLECTIBLE} to score. Avoid the {HAZARD}!")
     print("Use WASD to move, or type 'quit' to exit.\n")
     input("Press Enter to start...")
 

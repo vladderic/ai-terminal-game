@@ -1,7 +1,7 @@
 import unittest
 from io import StringIO
 from unittest.mock import patch
-from game import GRID_SIZE, PLAYER, COLLECTIBLE, HAZARD, EMPTY, WIN_SCORE, draw_grid, clear_screen, spawn_collectible, spawn_hazard
+from game import GRID_SIZE, PLAYER, COLLECTIBLE, HAZARD, EMPTY, WIN_SCORE, WIN_MESSAGE, LOSE_MESSAGE, draw_grid, clear_screen, spawn_collectible, spawn_hazard
 
 
 class TestClearScreen(unittest.TestCase):
@@ -188,7 +188,7 @@ class TestGameLoop(unittest.TestCase):
         mock_collect.side_effect = [(1, 0), (0, 0)] * 10
         moves = ["s", "w"] * 10
         output = self._run_game_with_inputs([""] + moves + ["n"])
-        self.assertIn("You win!", output)
+        self.assertIn(WIN_MESSAGE, output)
 
     # --- Hazard ---
 
@@ -205,7 +205,7 @@ class TestGameLoop(unittest.TestCase):
             from game import main
             main()
         output = buffer.getvalue()
-        self.assertIn("Game Over!", output)
+        self.assertIn(LOSE_MESSAGE, output)
 
     @patch("game.spawn_hazard")
     @patch("game.spawn_collectible")
@@ -221,7 +221,7 @@ class TestGameLoop(unittest.TestCase):
             from game import main
             main()
         output = buffer.getvalue()
-        self.assertIn("Game Over!", output)
+        self.assertIn(LOSE_MESSAGE, output)
         # Only 3 inputs consumed: start, move, play-again
 
     # --- Play again ---
@@ -244,7 +244,7 @@ class TestGameLoop(unittest.TestCase):
             from game import main
             main()
         output = buffer.getvalue()
-        self.assertIn("Game Over!", output)
+        self.assertIn(LOSE_MESSAGE, output)
         self.assertIn("Thanks for playing!", output)
 
     @patch("game.spawn_hazard")
@@ -271,7 +271,7 @@ class TestGameLoop(unittest.TestCase):
         mock_hazard.return_value = (0, 4)
         moves_win = ["s", "w"] * 10
         output = self._run_game_with_inputs([""] + moves_win + ["y", "s", "quit", "n"])
-        self.assertIn("You win!", output)
+        self.assertIn(WIN_MESSAGE, output)
         # Second round should show score 1/10
         self.assertIn("Score: 1/10", output)
 
