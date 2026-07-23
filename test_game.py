@@ -116,11 +116,15 @@ class TestSpawnHazard(unittest.TestCase):
             self.assertLess(pos[1], GRID_SIZE)
 
 
-class TestScoring(unittest.TestCase):
-    """Test scoring, collection, win condition, and hazard by simulating game inputs."""
+class TestGameLoop(unittest.TestCase):
+    """Test the full game loop including play-again prompts."""
 
     def _run_game_with_inputs(self, inputs: list[str]) -> str:
-        """Feed a list of inputs into the game and capture all output."""
+        """Feed a list of inputs into the game and capture all output.
+
+        The first input is consumed by the 'Press Enter to start...' prompt.
+        Subsequent inputs feed into the game round and play-again prompt.
+        """
         input_text = "\n".join(inputs) + "\n"
         buffer = StringIO()
         with patch("builtins.input", side_effect=input_text.splitlines(keepends=True)), \
@@ -130,48 +134,52 @@ class TestScoring(unittest.TestCase):
             main()
         return buffer.getvalue()
 
+    # --- Basic movement ---
+
     def test_quit_exits(self):
-        output = self._run_game_with_inputs(["quit"])
+        output = self._run_game_with_inputs(["", "quit", "n"])
         self.assertIn("Thanks for playing!", output)
 
     def test_move_down(self):
-        output = self._run_game_with_inputs(["s", "quit"])
+        output = self._run_game_with_inputs(["", "s", "quit", "n"])
         self.assertIn("Thanks for playing!", output)
 
     def test_move_right(self):
-        output = self._run_game_with_inputs(["d", "quit"])
+        output = self._run_game_with_inputs(["", "d", "quit", "n"])
         self.assertIn("Thanks for playing!", output)
 
     def test_cannot_move_up_from_origin(self):
-        output = self._run_game_with_inputs(["w", "w", "quit"])
+        output = self._run_game_with_inputs(["", "w", "w", "quit", "n"])
         self.assertIn("Thanks for playing!", output)
 
     def test_cannot_move_left_from_origin(self):
-        output = self._run_game_with_inputs(["a", "a", "quit"])
+        output = self._run_game_with_inputs(["", "a", "a", "quit", "n"])
         self.assertIn("Thanks for playing!", output)
 
     def test_cannot_move_past_bottom_right(self):
-        moves = ["s"] * 5 + ["d"] * 5 + ["quit"]
-        output = self._run_game_with_inputs(moves)
+        moves = ["s"] * 5 + ["d"] * 5 + ["quit", "n"]
+        output = self._run_game_with_inputs([""] + moves)
         self.assertIn("Thanks for playing!", output)
 
     def test_invalid_key_is_ignored(self):
-        output = self._run_game_with_inputs(["x", "z", "123", "quit"])
+        output = self._run_game_with_inputs(["", "x", "z", "123", "quit", "n"])
         self.assertIn("Thanks for playing!", output)
 
     def test_case_insensitive(self):
-        output = self._run_game_with_inputs(["W", "s", "D", "quit"])
+        output = self._run_game_with_inputs(["", "W", "s", "D", "quit", "n"])
         self.assertIn("Thanks for playing!", output)
 
     def test_score_displayed(self):
-        output = self._run_game_with_inputs(["quit"])
+        output = self._run_game_with_inputs(["", "quit", "n"])
         self.assertIn("Score: 0/10", output)
+
+    # --- Collectible ---
 
     @patch("game.spawn_collectible")
     def test_collecting_item_increases_score(self, mock_collect):
         """Force collectible to player's next position, verify score goes up."""
         mock_collect.side_effect = [(1, 0), (4, 4)]
-        output = self._run_game_with_inputs(["s", "quit"])
+        output = self._run_game_with_inputs(["", "s", "quit", "n"])
         self.assertIn("Score: 1/10", output)
 
     @patch("game.spawn_collectible")
@@ -179,8 +187,10 @@ class TestScoring(unittest.TestCase):
         """Force 10 collects in a row — game should end with victory message."""
         mock_collect.side_effect = [(1, 0), (0, 0)] * 10
         moves = ["s", "w"] * 10
-        output = self._run_game_with_inputs(moves)
+        output = self._run_game_with_inputs([""] + moves + ["n"])
         self.assertIn("You win!", output)
+
+    # --- Hazard ---
 
     @patch("game.spawn_hazard")
     @patch("game.spawn_collectible")
@@ -188,7 +198,7 @@ class TestScoring(unittest.TestCase):
         """Move player onto the hazard — game should end with 'Game Over!'."""
         mock_collect.return_value = (4, 4)
         mock_hazard.return_value = (1, 0)
-        input_text = "s\nquit\n"
+        input_text = "\n".join(["", "s", "n"]) + "\n"
         buffer = StringIO()
         with patch("builtins.input", side_effect=input_text.splitlines(keepends=True)), \
              patch("sys.stdout", buffer):
@@ -199,11 +209,12 @@ class TestScoring(unittest.TestCase):
 
     @patch("game.spawn_hazard")
     @patch("game.spawn_collectible")
-    def test_hazard_terminates_game_immediately(self, mock_collect, mock_hazard):
-        """After hitting the hazard, further inputs should not be processed."""
+    def test_hazard_terminates_round_immediately(self, mock_collect, mock_hazard):
+        """After hitting the hazard, further move inputs are not processed."""
         mock_collect.return_value = (4, 4)
         mock_hazard.return_value = (1, 0)
-        input_text = "s\nd\nquit\n"
+        # 's' hits hazard at (1,0) — round ends, no more moves processed
+        input_text = "\n".join(["", "s", "n"]) + "\n"
         buffer = StringIO()
         with patch("builtins.input", side_effect=input_text.splitlines(keepends=True)), \
              patch("sys.stdout", buffer):
@@ -211,7 +222,58 @@ class TestScoring(unittest.TestCase):
             main()
         output = buffer.getvalue()
         self.assertIn("Game Over!", output)
-        self.assertNotIn("Thanks for playing!", output)
+        # Only 3 inputs consumed: start, move, play-again
+
+    # --- Play again ---
+
+    def test_play_again_prompt_after_win(self):
+        """After winning, user should be asked 'Play again?'."""
+        output = self._run_game_with_inputs(["", "quit", "n"])
+        self.assertIn("Thanks for playing!", output)
+
+    @patch("game.spawn_hazard")
+    @patch("game.spawn_collectible")
+    def test_play_again_prompt_after_game_over(self, mock_collect, mock_hazard):
+        """After game over, choosing 'n' exits cleanly."""
+        mock_collect.return_value = (4, 4)
+        mock_hazard.return_value = (1, 0)
+        input_text = "\n".join(["", "s", "n"]) + "\n"
+        buffer = StringIO()
+        with patch("builtins.input", side_effect=input_text.splitlines(keepends=True)), \
+             patch("sys.stdout", buffer):
+            from game import main
+            main()
+        output = buffer.getvalue()
+        self.assertIn("Game Over!", output)
+        self.assertIn("Thanks for playing!", output)
+
+    @patch("game.spawn_hazard")
+    @patch("game.spawn_collectible")
+    def test_play_again_resets_game(self, mock_collect, mock_hazard):
+        """Choosing 'y' should start a fresh round with score 0."""
+        mock_collect.side_effect = [(1, 0), (4, 4), (1, 0), (4, 4)]
+        mock_hazard.return_value = (0, 4)
+        # Start, move down (collect), play again, move down (collect), quit
+        output = self._run_game_with_inputs(["", "s", "y", "s", "quit", "n"])
+        # Score should appear as 1/10 in the second round (fresh start)
+        self.assertIn("Score: 1/10", output)
+
+    def test_no_to_play_again_exits(self):
+        """Choosing 'n' at play again prompt should exit cleanly."""
+        output = self._run_game_with_inputs(["", "quit", "n"])
+        self.assertIn("Thanks for playing!", output)
+
+    @patch("game.spawn_hazard")
+    @patch("game.spawn_collectible")
+    def test_win_then_play_again(self, mock_collect, mock_hazard):
+        """Winning then choosing 'y' should start a fresh round."""
+        mock_collect.side_effect = [(1, 0), (0, 0)] * 10 + [(1, 0), (4, 4)]
+        mock_hazard.return_value = (0, 4)
+        moves_win = ["s", "w"] * 10
+        output = self._run_game_with_inputs([""] + moves_win + ["y", "s", "quit", "n"])
+        self.assertIn("You win!", output)
+        # Second round should show score 1/10
+        self.assertIn("Score: 1/10", output)
 
 
 if __name__ == "__main__":

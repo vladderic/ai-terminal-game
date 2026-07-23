@@ -46,15 +46,12 @@ def spawn_hazard(player_pos: tuple[int, int], collectible_pos: tuple[int, int]) 
         if pos != player_pos and pos != collectible_pos:
             return pos
 
-def main():
+def play_round() -> bool:
+    """Play one round of the game. Returns True to play again, False to quit."""
     player_pos = [0, 0]
     score = 0
     collectible_pos = spawn_collectible(tuple(player_pos))
     hazard_pos = spawn_hazard(tuple(player_pos), collectible_pos)
-
-    print("Welcome! You are the '@' symbol on a 5x5 grid.")
-    print("Collect the '★' to score points. Avoid the 'X'!")
-    print("Use WASD to move, or type 'quit' to exit.\n")
 
     while True:
         clear_screen()
@@ -64,9 +61,10 @@ def main():
         command = input("Move (WASD) or quit: ").strip().lower()
 
         if command == "quit":
-            print("Thanks for playing!")
-            break
-        elif command == "w" and player_pos[0] > 0:
+            return False
+
+        # Move player
+        if command == "w" and player_pos[0] > 0:
             player_pos[0] -= 1
         elif command == "s" and player_pos[0] < GRID_SIZE - 1:
             player_pos[0] += 1
@@ -75,7 +73,7 @@ def main():
         elif command == "d" and player_pos[1] < GRID_SIZE - 1:
             player_pos[1] += 1
 
-        # Check if player hit the hazard
+        # Check hazard
         if tuple(player_pos) == hazard_pos:
             clear_screen()
             print(f"Score: {score}/{WIN_SCORE}")
@@ -83,7 +81,7 @@ def main():
             print("Game Over!")
             break
 
-        # Check if player collected the item
+        # Check collectible
         if tuple(player_pos) == collectible_pos:
             score += 1
             if score >= WIN_SCORE:
@@ -93,6 +91,25 @@ def main():
                 print("You win! Well played!")
                 break
             collectible_pos = spawn_collectible(tuple(player_pos))
+
+    # Ask to play again
+    while True:
+        answer = input("Play again? (y/n): ").strip().lower()
+        if answer == "y":
+            return True
+        if answer == "n":
+            return False
+
+def main():
+    print("Welcome! You are the '@' symbol on a 5x5 grid.")
+    print("Collect the '★' to score points. Avoid the 'X'!")
+    print("Use WASD to move, or type 'quit' to exit.\n")
+    input("Press Enter to start...")
+
+    while True:
+        if not play_round():
+            print("Thanks for playing!")
+            break
 
 if __name__ == "__main__":
     main()
